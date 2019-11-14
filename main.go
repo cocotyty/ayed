@@ -8,8 +8,8 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"flag"
 
-	"github.com/urfave/cli"
 	"gopkg.in/yaml.v2"
 )
 
@@ -32,30 +32,13 @@ type Command struct {
 }
 
 func main() {
-	app := &cli.App{
-		Name:  "ayed",
-		Usage: "Another YAML editor",
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:  "f",
-				Value: "",
-				Usage: "yaml file",
-			},
-			&cli.StringFlag{
-				Name:  "s",
-				Value: "",
-				Usage: "script file",
-			},
-		},
-		Action: func(c *cli.Context) error {
-			App(c.String("s"), c.String("f"))
-			return nil
-		},
-	}
-	err := app.Run(os.Args)
-	if err != nil {
-		log.Fatal(err)
-	}
+	var (
+		s  = flag.String("s","script file","")
+		f  = flag.String("f","source file","")
+	)
+	flag.Parse()
+	App(*s, *f)
+
 }
 
 // App run application
