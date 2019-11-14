@@ -33,8 +33,8 @@ type Command struct {
 
 func main() {
 	var (
-		s  = flag.String("s","script file","")
-		f  = flag.String("f","source file","")
+		s  = flag.String("s","","script file")
+		f  = flag.String("f","","source file")
 	)
 	flag.Parse()
 	App(*s, *f)
