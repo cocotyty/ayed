@@ -1,8 +1,11 @@
 # AYED
 Another YAML command-line Editor.
-
-# USAGE
-## EXAMPLE
+## INSTALL
+```bash
+go get -u github.com/cocotyty/ayed
+```
+## USAGE
+### EDIT EXAMPLE
 source.yaml:
 ```yaml
 doc:
@@ -66,7 +69,46 @@ doc:
     create: "2019-02-14"
     update: "2019-02-15"
 ```
-## script rules:
+### READ EXAMPLE
+source.yaml:
+```yaml
+doc:
+  title:
+    text: AYED
+  content:
+    - text: "the reason for use this project"
+      color: red
+  status:
+   create: 2019-02-14
+```
+#### example 1
+```bash
+ayed -f ./source.yaml -r 'content.0.text' -p 'doc' 
+```
+will print:
+```text
+the reason for use this project
+```
+
+#### example 2
+```bash
+ayed -f ./source.yaml -r text -m color=red 
+```
+will print:
+```text
+the reason for use this project
+```
+
+#### example 3
+```bash
+ayed -f ./source.yaml -r text  -p doc.title.text
+```
+will print:
+```text
+AYED
+```
+
+### script rules:
 - **path** is regex that will match the yaml node path you want to edited.
 - **has_fields** is a map that will match the yaml map node.
 - **action: delete**  delete the matched node.
