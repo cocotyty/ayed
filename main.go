@@ -1,14 +1,15 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
-	"flag"
 
 	"gopkg.in/yaml.v2"
 )
@@ -18,6 +19,7 @@ const (
 	ActionReplace = "replace"
 	ActionMerge   = "merge"
 	ActionAppend  = "append"
+	ActionRead    = "read"
 )
 
 type Commands struct {
@@ -31,20 +33,42 @@ type Command struct {
 	Params interface{}       `yaml:"params"`
 }
 
+// -r . -m a:b,c:d -p ??
 func main() {
 	var (
-		s  = flag.String("s","","script file")
-		f  = flag.String("f","","source file")
+		s = flag.String("s", "", "script file")
+		f = flag.String("f", "", "source file")
+		r = flag.String("r", "", "read path")
+		m = flag.String("m", "", "has fields")
+		p = flag.String("p", "", "match path")
 	)
 	flag.Parse()
-	App(*s, *f)
+	App(*s, *f, *r, *m, *p)
+}
 
+func parseMatchFieldsFlag(m string) (result map[string]string) {
+	result = map[string]string{}
+	list := strings.Split(m, ",")
+	for _, kv := range list {
+		pair := strings.Split(kv, "=")
+		if len(pair) == 2 {
+			result[pair[0]] = pair[1]
+		}
+	}
+	return result
 }
 
 // App run application
-func App(scriptFile string, destFile string) {
+func App(scriptFile string, destFile string, read string, matchFields, path string) {
 	var commands = &Commands{}
-	if scriptFile != "" {
+	if read != "" {
+		commands.Commands = append(commands.Commands, Command{
+			Path:   path,
+			Fields: parseMatchFieldsFlag(matchFields),
+			Action: "read",
+			Params: read,
+		})
+	} else if scriptFile != "" {
 		file, err := os.Open(scriptFile)
 		check(err)
 		var raw = yaml.MapSlice{}
@@ -59,12 +83,11 @@ func App(scriptFile string, destFile string) {
 				list := pair.Value.([]interface{})
 				for i, cmd := range list {
 					commands.Commands[i].Params = YamlMapGet(cmd.(yaml.MapSlice), "params")
-
 				}
 			}
 		}
 	} else {
-
+		log.Fatal("no script defined")
 	}
 	var file io.ReadCloser
 	if destFile == "" {
@@ -154,9 +177,9 @@ func matchKV(kv map[string]string, hash yaml.MapSlice) bool {
 		}
 	}
 	for k, v := range kv {
-		if val,ok:=trans[k];!ok{
+		if val, ok := trans[k]; !ok {
 			return false
-		}else if !regMatch(v, val){
+		} else if !regMatch(v, val) {
 			return false
 		}
 	}
@@ -165,6 +188,11 @@ func matchKV(kv map[string]string, hash yaml.MapSlice) bool {
 
 func doAction(cmd *Command, object interface{}, action string, params interface{}, remove func()) (nObject interface{}, skip bool) {
 	switch action {
+	case ActionRead:
+		val := ReadValue(object, params.(string))
+		fmt.Print(val)
+		os.Exit(0)
+		return nil, false
 	case ActionAppend:
 		switch realObject := object.(type) {
 		case []interface{}:
@@ -202,12 +230,20 @@ func doAction(cmd *Command, object interface{}, action string, params interface{
 	}
 }
 
+var beforeLoopActions = map[string]bool{
+	ActionDelete: true,
+	ActionRead:   true,
+}
+
 func Filter(beforeLoop bool, currentPath string, key interface{}, object interface{}, ctx *Context, remove func()) (nObject interface{}, skip bool) {
-	if beforeLoop && ctx.Action != ActionDelete {
-		return object, false
-	}
-	if !beforeLoop && ctx.Action == ActionDelete {
-		return object, false
+	if beforeLoop {
+		if !beforeLoopActions[ctx.Action] {
+			return object, false
+		}
+	}else{
+		if beforeLoopActions[ctx.Action] {
+			return object, false
+		}
 	}
 	if ctx.Path != "" && !regMatch(ctx.Path, currentPath) {
 		return object, false
@@ -297,4 +333,64 @@ func YamlMapGet(m yaml.MapSlice, key string) (value interface{}) {
 		}
 	}
 	return value
+}
+
+func ReadValue(val interface{}, path string) interface{} {
+	if path == "." {
+		return val
+	}
+	return readValue(val, parsePath(path))
+}
+
+func readValue(val interface{}, path []string) interface{} {
+	if len(path) == 0 {
+		return val
+	}
+	switch rval := val.(type) {
+	case yaml.MapSlice:
+		return readValue(YamlMapGet(rval, path[0]), path[1:])
+	case []interface{}:
+		num, err := strconv.Atoi(path[0])
+		if err != nil {
+			panic("no such node")
+		}
+		return readValue(rval[num], path[1:])
+	default:
+		if len(path) != 0 {
+			panic("no such node")
+		}
+	}
+	return nil
+}
+
+func parsePath(path string) (result []string) {
+	if path[0] == '.' {
+		path = path[1:]
+	}
+	var buf []rune
+	var chars = []rune(path)
+	for i := 0; i < len(chars); i++ {
+		char := chars[i]
+		if char == '.' {
+			result = append(result, string(buf))
+			buf = nil
+			continue
+		}
+		if char == '\\' && i != len(chars)-1 {
+			switch path[i+1] {
+			case '.':
+				buf = append(buf, '.')
+				i++
+			case '\\':
+				buf = append(buf, '\\')
+				i++
+			default:
+				buf = append(buf, char)
+			}
+		} else {
+			buf = append(buf, char)
+		}
+	}
+	result = append(result, string(buf))
+	return result
 }
