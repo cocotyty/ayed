@@ -1,0 +1,21 @@
+commands:
+  - path: doc\.title
+    action: delete
+  - has_fields:
+      create: .*
+    action: merge
+    params:
+      update: 2019-02-15
+  - path: doc\.content\.0\.text
+    action: replace
+    params: "no good documents"
+  - path: doc\.content
+    action: append
+    params:
+      text: "second row"
+      color: blue
+  - path: doc\.content
+    action: merge
+    params:
+      - text: "third row"
+        color: yellow

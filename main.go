@@ -171,7 +171,9 @@ func matchKV(kv map[string]string, hash yaml.MapSlice) bool {
 		}
 	}
 	for k, v := range kv {
-		if !regMatch(v, trans[k]) {
+		if val,ok:=trans[k];!ok{
+			return false
+		}else if !regMatch(v, val){
 			return false
 		}
 	}
