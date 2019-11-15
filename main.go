@@ -190,7 +190,13 @@ func doAction(cmd *Command, object interface{}, action string, params interface{
 	switch action {
 	case ActionRead:
 		val := ReadValue(object, params.(string))
-		fmt.Print(val)
+		switch realObject := val.(type) {
+		case yaml.MapSlice,[]interface{}:
+			data,_:=yaml.Marshal(realObject)
+			fmt.Print(string(data))
+		default:
+			fmt.Print(val)
+		}
 		os.Exit(0)
 		return nil, false
 	case ActionAppend:
